@@ -14,8 +14,12 @@ app = Client("PollForwardingBot", bot_token=os.environ["BOT_TOKEN"])
 
 @app.on_message(filters.poll & filters.chat(FORWARD_FROM_CHATID))
 async def forward_poll(client, message: Message):
+    """Forward a poll to another chat and reference the original message"""
     forwarded = await message.forward(FORWARD_TO_CHATID)
-    forwarded.reply_text(message.link, quote=True, disable_notification=True)
+    if not isinstance(forwarded, Message):
+        raise RuntimeError(f"Unexpected return value from forward: {forwarded}")
+    if message.chat.type in {"group", "supergroup", "channel"}:
+        await forwarded.reply_text(message.link, quote=True, disable_notification=True)
 
 
 @app.on_message(
