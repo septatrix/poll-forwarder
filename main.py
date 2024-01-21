@@ -1,34 +1,50 @@
-import os
+import argparse
+import json
+import logging
+from pathlib import Path
+from typing import cast
 
-import dotenv
-from pyrogram import Client, filters
-from pyrogram.types import Message
+from telegram import Update
+from telegram.ext import ApplicationBuilder, ContextTypes, MessageHandler, filters
 
-dotenv.load_dotenv()
-
-FORWARD_FROM_CHATID = int(os.environ["FORWARD_FROM_CHATID"])
-FORWARD_TO_CHATID = int(os.environ["FORWARD_TO_CHATID"])
-
-app = Client("PollForwardingBot", bot_token=os.environ["BOT_TOKEN"])
+logging.basicConfig(level=logging.INFO)
 
 
-@app.on_message(filters.poll & ~filters.edited & filters.chat(FORWARD_FROM_CHATID))
-async def forward_poll(client, message: Message):
-    """Forward a poll to another chat and reference the original message"""
-    forwarded = await message.forward(FORWARD_TO_CHATID)
-    if not isinstance(forwarded, Message):
-        raise RuntimeError(f"Unexpected return value from forward: {forwarded}")
-    if message.chat.type in {"group", "supergroup", "channel"}:
-        await forwarded.reply_text(message.link, quote=True, disable_notification=True)
+async def forward(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.effective_message:
+        logging.error(f"Update does not contain message: {update}")
+        return
+
+    # TODO use asyncio.gather to speed this up
+    for target_chat_id in (context.chat_data or {}).get("target_chat_ids", []):
+        forwarded_msg = await update.effective_message.forward(target_chat_id)
+        if update.effective_message.link:
+            await forwarded_msg.reply_text(
+                update.effective_message.link, disable_notification=True
+            )
 
 
-@app.on_message(
-    (filters.new_chat_members | filters.left_chat_member)
-    & filters.chat(FORWARD_TO_CHATID)
-)
-async def delete_member_change_notification(client, message: Message):
-    return await message.delete()
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--token-file", required=True, type=Path)
+    parser.add_argument("--config", default="config.json", type=Path)
+    args = parser.parse_args()
+
+    token = cast(Path, args.token_file).read_text().strip()
+
+    application = ApplicationBuilder().token(token).build()
+
+    with cast(Path, args.config).open("rb") as f:
+        config = json.load(f)
+    for chat_id, forward_targets in config.items():
+        application.chat_data[int(chat_id)]["target_chat_ids"] = forward_targets
+    logging.info(f"Using following forwarding map: {application.chat_data}")
+
+    start_handler = MessageHandler(filters.POLL & ~filters.UpdateType.EDITED, forward)
+    application.add_handler(start_handler)
+
+    application.run_polling()
 
 
 if __name__ == "__main__":
-    app.run()
+    main()

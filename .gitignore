@@ -1,9 +1,6 @@
 # Secrets and keys
-config.ini
-.env
-
-# Session
-*.session
+config.json
+.token
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
