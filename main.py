@@ -7,7 +7,7 @@ from typing import cast
 from telegram import Update
 from telegram.ext import ApplicationBuilder, ContextTypes, MessageHandler, filters
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.WARNING)
 
 
 async def forward(update: Update, context: ContextTypes.DEFAULT_TYPE):
