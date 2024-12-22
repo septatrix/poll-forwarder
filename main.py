@@ -5,9 +5,16 @@ from pathlib import Path
 from typing import cast
 
 from telegram import Update
-from telegram.ext import ApplicationBuilder, ContextTypes, MessageHandler, filters
+from telegram.ext import (
+    ApplicationBuilder,
+    ContextTypes,
+    MessageHandler,
+    ChatMemberHandler,
+    filters,
+)
 
-logging.basicConfig(level=logging.WARNING)
+logging.basicConfig(level=logging.INFO)
+logging.getLogger("httpx").setLevel(logging.WARNING)
 
 
 async def forward(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -22,6 +29,10 @@ async def forward(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await forwarded_msg.reply_text(
                 update.effective_message.link, disable_notification=True
             )
+
+
+async def membership_update(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    logging.info(f"Membership update: {update.to_json()}")
 
 
 def main():
@@ -40,8 +51,12 @@ def main():
         application.chat_data[int(chat_id)]["target_chat_ids"] = forward_targets
     logging.info(f"Using following forwarding map: {application.chat_data}")
 
-    start_handler = MessageHandler(filters.POLL & ~filters.UpdateType.EDITED, forward)
-    application.add_handler(start_handler)
+    poll_handler = MessageHandler(filters.POLL & ~filters.UpdateType.EDITED, forward)
+    application.add_handler(poll_handler)
+    membership_handler = ChatMemberHandler(
+        membership_update, chat_member_types=ChatMemberHandler.MY_CHAT_MEMBER
+    )
+    application.add_handler(membership_handler)
 
     application.run_polling()
 
