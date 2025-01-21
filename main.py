@@ -6,6 +6,7 @@ from typing import cast
 
 from telegram import Update
 from telegram.ext import (
+    Application,
     ApplicationBuilder,
     ContextTypes,
     MessageHandler,
@@ -46,10 +47,22 @@ def main():
     application = ApplicationBuilder().token(token).build()
 
     with cast(Path, args.config).open("rb") as f:
-        config = json.load(f)
+        config = {
+            int(chat_id): targets
+            for chat_id, targets in cast(dict[str, list[int]], json.load(f)).items()
+        }
+
     for chat_id, forward_targets in config.items():
-        application.chat_data[int(chat_id)]["target_chat_ids"] = forward_targets
-    logging.info(f"Using following forwarding map: {application.chat_data}")
+        application.chat_data[chat_id]["target_chat_ids"] = forward_targets
+
+    async def post_init_hook(application: Application):
+        for chat_id, forward_targets in config.items():
+            from_chat = await application.bot.get_chat(chat_id)
+            for target in forward_targets:
+                to_chat = await application.bot.get_chat(target)
+                logging.info(f"Forwarding from {from_chat.title} to {to_chat.title}")
+
+    application.post_init = post_init_hook
 
     poll_handler = MessageHandler(filters.POLL & ~filters.UpdateType.EDITED, forward)
     application.add_handler(poll_handler)
