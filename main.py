@@ -60,7 +60,9 @@ def main():
             from_chat = await application.bot.get_chat(chat_id)
             for target in forward_targets:
                 to_chat = await application.bot.get_chat(target)
-                logging.info(f"Forwarding from {from_chat.title} to {to_chat.title}")
+                logging.info(
+                    f"Forwarding from {from_chat.effective_name} to {to_chat.effective_name}"
+                )
 
     application.post_init = post_init_hook
 
