@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import cast
 
 from telegram import Update
+from telegram.error import TelegramError
 from telegram.ext import (
     Application,
     ApplicationBuilder,
@@ -30,7 +31,11 @@ async def forward(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # TODO use asyncio.gather to speed this up
     for target_chat_id in (context.chat_data or {}).get("target_chat_ids", []):
         if context_msg:
-            await context_msg.forward(target_chat_id, disable_notification=True)
+            # Forwarding the context is best-effort, it may e.g. be protected
+            try:
+                await context_msg.forward(target_chat_id, disable_notification=True)
+            except TelegramError as e:
+                logging.warning(f"Could not forward message replied to by poll: {e}")
         forwarded_msg = await update.effective_message.forward(target_chat_id)
         if update.effective_message.link:
             await forwarded_msg.reply_text(
