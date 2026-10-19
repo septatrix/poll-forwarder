@@ -23,8 +23,14 @@ async def forward(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logging.error(f"Update does not contain message: {update}")
         return
 
+    # If the poll is a reply to another message (e.g. a picture),
+    # forward that message first to provide context for the poll
+    context_msg = update.effective_message.reply_to_message
+
     # TODO use asyncio.gather to speed this up
     for target_chat_id in (context.chat_data or {}).get("target_chat_ids", []):
+        if context_msg:
+            await context_msg.forward(target_chat_id, disable_notification=True)
         forwarded_msg = await update.effective_message.forward(target_chat_id)
         if update.effective_message.link:
             await forwarded_msg.reply_text(
