@@ -79,7 +79,9 @@ def main():
     )
     application.add_handler(membership_handler)
 
-    application.run_polling()
+    # Retry indefinitely during bootstrapping, e.g. when network connectivity
+    # is not yet available directly after a reboot
+    application.run_polling(bootstrap_retries=-1)
 
 
 if __name__ == "__main__":
